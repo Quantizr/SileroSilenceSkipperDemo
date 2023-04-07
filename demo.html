@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Video with Real-time Audio Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.12/dist/bundle.min.js"></script>
+  </head>
+  <body>
+    <video crossOrigin="anonymous" id="my-video" width="640" height="360" controls>
+      <source src="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4" type="video/mp4">
+    </video>
+    <div id="playbackSpeed"></div>
+    <br>
+    <label for="playbackFast">Playback Fast:</label>
+    <input type="range" min="0" max="5" step="0.1" value="3" id="playbackFast">
+    <div id="playbackFastSetting"></div>
+    <br>
+    <label for="playbackSlow">Playback Slow:</label>
+    <input type="range" min="0" max="5" step="0.1" value="1" id="playbackSlow">
+    <div id="playbackSlowSetting"></div>
+    <br>
+    <label for="positiveSpeechThreshold">Positive Speech Threshold:</label>
+    <input type="range" min="0" max="1" step="0.05" value="0.8" id="positiveSpeechThreshold">
+    <div id="positiveSpeechThresholdSetting"></div>
+    <br>
+    <label for="negativeSpeechThreshold">Negative Speech Threshold:</label>
+    <input type="range" min="0" max="1" step="0.05" value="0.6" id="negativeSpeechThreshold">
+    <div id="negativeSpeechThresholdSetting"></div>
+    <br>
+    <label for="noSpeakingSampleThreshold">No speaking samples (at base speed):</label>
+    <input type="range" min="1" max="16" step="1" value="8" id="noSpeakingSampleThreshold">
+    <div id="noSpeakingSampleThresholdSetting"></div>
+    <script>
+      window.onload = function() {
+        //ADJUSTABLE
+        let playbackFast = 3.0;
+        let playbackSlow = 1.0;
+        let positiveSpeechThreshold = 0.8;
+        let negativeSpeechThreshold = 0.6;
+        let noSpeakingSampleThreshold = 8;
+        //
+        let playbackSpeed = 1.0;
+
+        const playbackFastSlider = document.getElementById('playbackFast');
+        const playbackSlowSlider = document.getElementById('playbackSlow');
+        const positiveSpeechThresholdSlider = document.getElementById('positiveSpeechThreshold');
+        const negativeSpeechThresholdSlider = document.getElementById('negativeSpeechThreshold');
+        const playbackSpeedDisplay = document.getElementById('playbackSpeed');
+        const noSpeakingSampleThresholdSlider = document.getElementById('noSpeakingSampleThreshold');
+
+        playbackFastSlider.addEventListener('input', (e) => {
+          playbackFast = e.target.value;
+          playbackFastSetting.textContent = playbackFast;
+        });
+
+        playbackSlowSlider.addEventListener('input', (e) => {
+          playbackSlow = e.target.value;
+          playbackSlowSetting.textContent = playbackSlow;
+        });
+
+        positiveSpeechThresholdSlider.addEventListener('input', (e) => {
+          positiveSpeechThreshold = e.target.value;
+          positiveSpeechThresholdSetting.textContent = positiveSpeechThreshold;
+        });
+
+        negativeSpeechThresholdSlider.addEventListener('input', (e) => {
+          negativeSpeechThreshold = e.target.value;
+          negativeSpeechThresholdSetting.textContent = negativeSpeechThreshold;
+        });
+
+        noSpeakingSampleThresholdSlider.addEventListener('input', (e) => {
+          noSpeakingSampleThreshold = e.target.value;
+          noSpeakingSampleThresholdSetting.textContent = noSpeakingSampleThreshold;
+        });
+
+        playbackSpeedDisplay.textContent = `Playback Speed: ${playbackSpeed}`;
+        playbackFastSetting.textContent = playbackFast;
+        playbackSlowSetting.textContent = playbackSlow;
+        positiveSpeechThresholdSetting.textContent = positiveSpeechThreshold;
+        negativeSpeechThresholdSetting.textContent = negativeSpeechThreshold;
+        noSpeakingSampleThresholdSetting.textContent = noSpeakingSampleThreshold;
+        
+
+        const video = document.getElementById("my-video");
+
+        let audioCtx;
+        let source;
+        let analyser;
+        let bufferLength;
+        let dataArray;
+        let maxVal = 0;
+        
+        let noSpeakingSamples = 0;
+
+        let audioNodeVAD;
+
+        async function main() {
+          audioNodeVAD = await vad.AudioNodeVAD.new(audioCtx, {
+            frameSamples: 512, //11.61ms @ 44.1KHz, default value
+            positiveSpeechThreshold: 1, //prevent default threshold from loading
+            negativeSpeechThreshold: 0, //prevent default threshold from loading
+            onFrameProcessed: (probabilities) => {
+              //console.log("Frame processed", probabilities);
+              if (probabilities.isSpeech > positiveSpeechThreshold && playbackSpeed != playbackSlow) {
+                playbackSpeed = playbackSlow;
+                video.playbackRate = playbackSpeed;
+                playbackSpeedDisplay.textContent = `Playback Speed: ${playbackSpeed}`;
+                noSpeakingSamples = 0;
+                console.log("Speech started - slowing down")
+              }
+
+              if (probabilities.isSpeech < negativeSpeechThreshold && playbackSpeed != playbackFast) {
+                noSpeakingSamples++;
+                if (noSpeakingSamples >= Math.round(noSpeakingSampleThreshold/playbackSlow)) { //dynamically adjust silence gap based on video speed
+                  playbackSpeed = playbackFast;
+                  video.playbackRate = playbackSpeed;
+                  playbackSpeedDisplay.textContent = `Playback Speed: ${playbackSpeed}`;
+                  console.log("End of speech - speeding up")
+                }
+              }
+
+            }
+          });
+        }
+
+        video.addEventListener("play", function() {
+          if (!source) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100}); //force sample rate so that frame sample time is consistent
+            source = audioCtx.createMediaElementSource(video);
+
+            analyser = audioCtx.createAnalyser();
+            //analyser.fftSize = 2048;
+
+            source.connect(analyser);
+            analyser.connect(audioCtx.destination);
+
+            main().then(() => {
+              audioNodeVAD.receive(source);
+              audioNodeVAD.start();
+            })
+          } else {
+            audioNodeVAD.start();
+          } 
+        });
+
+        video.addEventListener("pause", () => {
+          audioNodeVAD.pause();
+        });
+      };
+    </script>
+  </body>
+</html>

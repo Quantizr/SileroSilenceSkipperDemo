@@ -6,6 +6,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.12/dist/bundle.min.js"></script>
   </head>
   <body>
+    <p>SileroVAD begins loading when the play button is pressed, it will take around 10 seconds before it starts processing audio</p>
     <video crossOrigin="anonymous" id="my-video" width="640" height="360" controls>
       <source src="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4" type="video/mp4">
     </video>
@@ -28,7 +29,7 @@
     <div id="negativeSpeechThresholdSetting"></div>
     <br>
     <label for="noSpeakingSampleThreshold">No speaking samples (at base speed):</label>
-    <input type="range" min="1" max="16" step="1" value="8" id="noSpeakingSampleThreshold">
+    <input type="range" min="1" max="10" step="1" value="4" id="noSpeakingSampleThreshold">
     <div id="noSpeakingSampleThresholdSetting"></div>
     <script>
       window.onload = function() {
@@ -37,7 +38,7 @@
         let playbackSlow = 1.0;
         let positiveSpeechThreshold = 0.8;
         let negativeSpeechThreshold = 0.6;
-        let noSpeakingSampleThreshold = 8;
+        let noSpeakingSampleThreshold = 4;
         //
         let playbackSpeed = 1.0;
 

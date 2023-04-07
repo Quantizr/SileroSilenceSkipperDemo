@@ -87,9 +87,6 @@
         let audioCtx;
         let source;
         let analyser;
-        let bufferLength;
-        let dataArray;
-        let maxVal = 0;
         
         let noSpeakingSamples = 0;
 
@@ -130,8 +127,6 @@
             source = audioCtx.createMediaElementSource(video);
 
             analyser = audioCtx.createAnalyser();
-            //analyser.fftSize = 2048;
-
             source.connect(analyser);
             analyser.connect(audioCtx.destination);
 

@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Video with Real-time Audio Analysis</title>
+    <title>Video with Speed Adjustment Based on Real-Time Voice Detection</title>
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.12/dist/bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web/dist/bundle.min.js"></script>
   </head>
   <body>
-    <p>SileroVAD begins loading when the play button is pressed, it will take around 10 seconds before it starts processing audio</p>
-    <video crossOrigin="anonymous" id="my-video" width="640" height="360" controls>
+    <p>SileroVAD takes around 10 seconds to load, if you start the video before that, video speed won't be adjusted until it loads.</p>
+    <video id="video" width="640" height="360" controls crossOrigin="anonymous">
       <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/GoogleIO-2014-CastingToTheFuture.mp4" type="video/mp4">
     </video>
     <div id="playbackSpeed"></div>
     <br>
     <label for="playbackFast">Playback Fast:</label>
-    <input type="range" min="0" max="5" step="0.1" value="3" id="playbackFast">
+    <input type="range" min="0" max="10" step="0.1" value="3" id="playbackFast">
     <div id="playbackFastSetting"></div>
     <br>
     <label for="playbackSlow">Playback Slow:</label>
@@ -21,11 +21,11 @@
     <div id="playbackSlowSetting"></div>
     <br>
     <label for="positiveSpeechThreshold">Positive Speech Threshold:</label>
-    <input type="range" min="0" max="1" step="0.05" value="0.8" id="positiveSpeechThreshold">
+    <input type="range" min="0" max="1" step="0.05" value="0.6" id="positiveSpeechThreshold">
     <div id="positiveSpeechThresholdSetting"></div>
     <br>
     <label for="negativeSpeechThreshold">Negative Speech Threshold:</label>
-    <input type="range" min="0" max="1" step="0.05" value="0.6" id="negativeSpeechThreshold">
+    <input type="range" min="0" max="1" step="0.05" value="0.4" id="negativeSpeechThreshold">
     <div id="negativeSpeechThresholdSetting"></div>
     <br>
     <label for="noSpeakingSampleThreshold">No speaking samples (at base speed):</label>
@@ -36,8 +36,8 @@
         //ADJUSTABLE
         let playbackFast = 3.0;
         let playbackSlow = 1.0;
-        let positiveSpeechThreshold = 0.8;
-        let negativeSpeechThreshold = 0.6;
+        let positiveSpeechThreshold = 0.6;
+        let negativeSpeechThreshold = 0.4;
         let noSpeakingSampleThreshold = 4;
         //
         let playbackSpeed = 1.0;
@@ -82,17 +82,18 @@
         noSpeakingSampleThresholdSetting.textContent = noSpeakingSampleThreshold;
         
 
-        const video = document.getElementById("my-video");
+        const video = document.getElementById("video");
 
-        let audioCtx;
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100}); //force sample rate so that frame sample time is consistent
         let source;
-        let analyser;
-        
-        let noSpeakingSamples = 0;
-
         let audioNodeVAD;
+        let noSpeakingSamples = 0;
+        let desyncCounter = 0;
 
-        async function main() {
+        let vadStarted = false;
+
+        async function startVAD() {
+          if (vadStarted) return;
           audioNodeVAD = await vad.AudioNodeVAD.new(audioCtx, {
             frameSamples: 512, //11.61ms @ 44.1KHz, default value
             positiveSpeechThreshold: 1, //prevent default threshold from loading
@@ -114,23 +115,34 @@
                   video.playbackRate = playbackSpeed;
                   playbackSpeedDisplay.textContent = `Playback Speed: ${playbackSpeed}`;
                   console.log("End of speech - speeding up")
+                  desyncCounter++;
+                  if (desyncCounter >= 10) {
+                    video.currentTime += 1e-9;
+                    desyncCounter = 0;
+                    console.log("Resync video/audio")
+                  }
                 }
               }
 
             }
           });
+          vadStarted = true;
         }
+
+        startVAD();
+
 
         video.addEventListener("play", function() {
           if (!source) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100}); //force sample rate so that frame sample time is consistent
+            audioCtx.resume();
             source = audioCtx.createMediaElementSource(video);
+            source.connect(audioCtx.destination);
 
-            analyser = audioCtx.createAnalyser();
-            source.connect(analyser);
-            analyser.connect(audioCtx.destination);
+            // source = new MediaStreamAudioSourceNode(audioCtx, {
+            //   mediaStream: video.captureStream(),
+            // })
 
-            main().then(() => {
+            startVAD().then(() => {
               audioNodeVAD.receive(source);
               audioNodeVAD.start();
             })

@@ -35,7 +35,7 @@
       window.onload = function() {
         //ADJUSTABLE
         let playbackFast = 3.0;
-        let playbackSlow = 1.0;
+        let playbackSlow = 1.5;
         let positiveSpeechThreshold = 0.6;
         let negativeSpeechThreshold = 0.4;
         let noSpeakingSampleThreshold = 4;
@@ -84,28 +84,40 @@
 
         const video = document.getElementById("video");
 
-        let audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 44100}); //force sample rate so that frame sample time is consistent
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)({});
         let source;
         let audioNodeVAD;
         let noSpeakingSamples = 0;
         let desyncCounter = 0;
 
         let vadStarted = false;
+        let fastTime = null;
+        let timeSaved = 0;
 
         async function startVAD() {
           if (vadStarted) return;
           audioNodeVAD = await vad.AudioNodeVAD.new(audioCtx, {
-            frameSamples: 512, //11.61ms @ 44.1KHz, default value
+            frameSamples: 512, //32ms @ 16KHz, sample rate is resampled to 16KHz
             positiveSpeechThreshold: 1, //prevent default threshold from loading
             negativeSpeechThreshold: 0, //prevent default threshold from loading
             onFrameProcessed: (probabilities) => {
-              //console.log("Frame processed", probabilities);
-              if (probabilities.isSpeech > positiveSpeechThreshold && playbackSpeed != playbackSlow) {
-                playbackSpeed = playbackSlow;
-                video.playbackRate = playbackSpeed;
-                playbackSpeedDisplay.textContent = `Playback Speed: ${playbackSpeed}`;
-                noSpeakingSamples = 0;
-                console.log("Speech started - slowing down")
+              //console.log("Frame processed", probabilities, video.currentTime);
+              if (probabilities.isSpeech > positiveSpeechThreshold) {
+                if (playbackSpeed != playbackSlow) {
+                  playbackSpeed = playbackSlow;
+                  video.playbackRate = playbackSpeed;
+                  playbackSpeedDisplay.textContent = `Playback Speed: ${playbackSpeed}`;
+                  noSpeakingSamples = 0
+                  const currentTime = video.currentTime;
+                  if (fastTime !== null) {
+                    const timeDiff = Math.round((currentTime - fastTime)*1000);
+                    console.log(`Sped up video time: ${timeDiff}ms`);
+                    timeSaved += Math.round(timeDiff/playbackSlow);
+                  }
+                  console.log("Speech started - slowing down - time saved ", timeSaved/1000);
+                } else {
+                  if (noSpeakingSamples > 0) noSpeakingSamples--;
+                }
               }
 
               if (probabilities.isSpeech < negativeSpeechThreshold && playbackSpeed != playbackFast) {
@@ -114,45 +126,69 @@
                   playbackSpeed = playbackFast;
                   video.playbackRate = playbackSpeed;
                   playbackSpeedDisplay.textContent = `Playback Speed: ${playbackSpeed}`;
-                  console.log("End of speech - speeding up")
+                  console.log("End of speech - speeding up");
                   desyncCounter++;
                   if (desyncCounter >= 10) {
                     video.currentTime += 1e-9;
                     desyncCounter = 0;
-                    console.log("Resync video/audio")
+                    console.log("Resync video/audio");
                   }
+                  fastTime = video.currentTime;
                 }
               }
-
             }
           });
-          vadStarted = true;
         }
 
-        startVAD();
+        startVAD().then(() => {
+          vadStarted = true;
+          if (!video.paused && !source) {
+            audioCtx.resume();
 
+            source = new MediaStreamAudioSourceNode(audioCtx, {
+              mediaStream: video.captureStream(),
+            })
+            const merger = audioCtx.createChannelMerger(1);
+            source.connect(merger);
+            audioNodeVAD.receive(merger);
+            audioNodeVAD.start();
+          }
+        });
 
         video.addEventListener("play", function() {
-          if (!source) {
+          fastTime = null;
+          if (vadStarted && !source) { //is this even possible
             audioCtx.resume();
-            source = audioCtx.createMediaElementSource(video);
-            source.connect(audioCtx.destination);
-
-            // source = new MediaStreamAudioSourceNode(audioCtx, {
-            //   mediaStream: video.captureStream(),
-            // })
-
-            startVAD().then(() => {
-              audioNodeVAD.receive(source);
-              audioNodeVAD.start();
+            source = new MediaStreamAudioSourceNode(audioCtx, {
+              mediaStream: video.captureStream(),
             })
-          } else {
-            audioNodeVAD.start();
-          } 
+            const merger = audioCtx.createChannelMerger(1);
+            source.connect(merger);
+            audioNodeVAD.receive(merger);
+          }
+          audioNodeVAD.start();
         });
 
         video.addEventListener("pause", () => {
+          fastTime = null;
           audioNodeVAD.pause();
+        });
+
+        video.addEventListener("seeked", () => {
+          fastTime = null;
+        });
+
+        video.addEventListener("loadeddata", () => {
+          fastTime = null;
+          if (vadStarted) {
+            audioCtx.resume();
+            source = new MediaStreamAudioSourceNode(audioCtx, {
+              mediaStream: video.captureStream(),
+            })
+            const merger = audioCtx.createChannelMerger(1);
+            source.connect(merger);
+            audioNodeVAD.receive(merger);
+          }
         });
       };
     </script>

@@ -112,7 +112,7 @@
                   if (fastTime !== null) {
                     const timeDiff = Math.round((currentTime - fastTime)*1000);
                     console.log(`Sped up video time: ${timeDiff}ms`);
-                    timeSaved += Math.round(timeDiff/playbackSlow);
+                    timeSaved += Math.round(timeDiff*(playbackFast-1)/(playbackFast*playbackSlow));
                   }
                   console.log("Speech started - slowing down - time saved ", timeSaved/1000);
                 } else {
@@ -140,31 +140,30 @@
           });
         }
 
-        startVAD().then(() => {
-          vadStarted = true;
-          if (!video.paused && !source) {
+        function setupVAD() {
+          if (vadStarted) {
             audioCtx.resume();
-
             source = new MediaStreamAudioSourceNode(audioCtx, {
               mediaStream: video.captureStream(),
             })
             const merger = audioCtx.createChannelMerger(1);
             source.connect(merger);
             audioNodeVAD.receive(merger);
+          }
+        }
+
+        startVAD().then(() => {
+          vadStarted = true;
+          if (!video.paused && !source) {
+            setupVAD();
             audioNodeVAD.start();
           }
         });
 
         video.addEventListener("play", function() {
           fastTime = null;
-          if (vadStarted && !source) { //is this even possible
-            audioCtx.resume();
-            source = new MediaStreamAudioSourceNode(audioCtx, {
-              mediaStream: video.captureStream(),
-            })
-            const merger = audioCtx.createChannelMerger(1);
-            source.connect(merger);
-            audioNodeVAD.receive(merger);
+          if (!source) { //is this even possible
+            setupVAD()
           }
           audioNodeVAD.start();
         });
@@ -180,15 +179,7 @@
 
         video.addEventListener("loadeddata", () => {
           fastTime = null;
-          if (vadStarted) {
-            audioCtx.resume();
-            source = new MediaStreamAudioSourceNode(audioCtx, {
-              mediaStream: video.captureStream(),
-            })
-            const merger = audioCtx.createChannelMerger(1);
-            source.connect(merger);
-            audioNodeVAD.receive(merger);
-          }
+          setupVAD()
         });
       };
     </script>

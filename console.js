@@ -231,11 +231,27 @@ function endDrag() {
   isDragging = false;
 
   //in order that minimize snaps to the correct side
-  const bottom = window.innerHeight - overlayContainer.getBoundingClientRect().bottom;
-  overlayContainer.style.bottom = `${bottom}px`;
-  overlayContainer.style.top = 'auto';
-}
+  const top = overlayContainer.getBoundingClientRect().top;
+  const left = overlayContainer.getBoundingClientRect().left;
+  const bottom = document.documentElement.clientHeight - overlayContainer.getBoundingClientRect().bottom;
+  const right = document.documentElement.clientWidth - overlayContainer.getBoundingClientRect().right;
 
+  if (top < document.documentElement.clientHeight/2) {
+    overlayContainer.style.top = `${top}px`;
+    overlayContainer.style.bottom = 'auto';
+  } else {
+    overlayContainer.style.top = 'auto';
+    overlayContainer.style.bottom = `${bottom}px`;
+  }
+
+  if (left < document.documentElement.clientWidth/2) {
+    overlayContainer.style.left = `${left}px`;
+    overlayContainer.style.right = 'auto';
+  } else {
+    overlayContainer.style.left = 'auto';
+    overlayContainer.style.right = `${right}px`;
+  }
+}
 
 function createSlider(labelText, min, max, defaultValue, step, onChange) {
   const sliderContainer = document.createElement('div');
@@ -284,8 +300,6 @@ function toggleMinimize() {
 
   minimizeButton.textContent = isMinimized ? '-' : '+';
 }
-
-
 
 function s(ps) {
   playbackSlow = ps;

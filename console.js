@@ -211,73 +211,78 @@ let offsetX, offsetY;
 
 // Functions for dragging
 function startDrag(e) {
-    isDragging = true;
-    offsetX = e.clientX - overlayContainer.getBoundingClientRect().left;
-    offsetY = e.clientY - overlayContainer.getBoundingClientRect().top;
+  isDragging = true;
+  offsetX = e.clientX - overlayContainer.getBoundingClientRect().left;
+  offsetY = e.clientY - overlayContainer.getBoundingClientRect().top;
 }
 
 function handleDrag(e) {
-    if (isDragging) {
-        const x = e.clientX - offsetX;
-        const y = e.clientY - offsetY;
-        overlayContainer.style.left = `${x}px`;
-        overlayContainer.style.top = `${y}px`;
-        overlayContainer.style.bottom = `auto`;
-        overlayContainer.style.right = `auto`;
-    }
+  if (isDragging) {
+    const x = e.clientX - offsetX;
+    const y = e.clientY - offsetY;
+    overlayContainer.style.left = `${x}px`;
+    overlayContainer.style.top = `${y}px`;
+    overlayContainer.style.bottom = 'auto';
+    overlayContainer.style.right = 'auto';
+  }
 }
 
 function endDrag() {
-    isDragging = false;
+  isDragging = false;
+
+  //in order that minimize snaps to the correct side
+  const bottom = window.innerHeight - overlayContainer.getBoundingClientRect().bottom;
+  overlayContainer.style.bottom = `${bottom}px`;
+  overlayContainer.style.top = 'auto';
 }
 
 
 function createSlider(labelText, min, max, defaultValue, step, onChange) {
-    const sliderContainer = document.createElement('div');
+  const sliderContainer = document.createElement('div');
 
-    const labelContainer = document.createElement('div');
-    labelContainer.style.display = 'flex';
-    labelContainer.style.justifyContent = 'space-between';
+  const labelContainer = document.createElement('div');
+  labelContainer.style.display = 'flex';
+  labelContainer.style.justifyContent = 'space-between';
 
-    const label = document.createElement('div');
-    label.textContent = labelText;
-    label.style.fontSize = '14px';
-    labelContainer.appendChild(label);
+  const label = document.createElement('div');
+  label.textContent = labelText;
+  label.style.fontSize = '14px';
+  labelContainer.appendChild(label);
 
-    const speedLabel = document.createElement('div');
-    speedLabel.textContent = `${parseFloat(defaultValue).toFixed(2)}x`;
-    speedLabel.style.fontSize = '14px';
-    labelContainer.appendChild(speedLabel);
+  const speedLabel = document.createElement('div');
+  speedLabel.textContent = `${parseFloat(defaultValue).toFixed(2)}x`;
+  speedLabel.style.fontSize = '14px';
+  labelContainer.appendChild(speedLabel);
 
-    sliderContainer.appendChild(labelContainer);
+  sliderContainer.appendChild(labelContainer);
 
-    const slider = document.createElement('input');
-    slider.type = 'range';
-    slider.min = min;
-    slider.max = max;
-    slider.value = defaultValue;
-    slider.step = step;
-    slider.style.width = '150px';
-    slider.style.marginBottom = '5px';
-    slider.addEventListener('input', () => {
-        const speed = parseFloat(slider.value).toFixed(2);
-        speedLabel.textContent = `${speed}x`;
-        onChange(speed);
-    });
-    sliderContainer.appendChild(slider);
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = min;
+  slider.max = max;
+  slider.value = defaultValue;
+  slider.step = step;
+  slider.style.width = '150px';
+  slider.style.marginBottom = '5px';
+  slider.addEventListener('input', () => {
+    const speed = parseFloat(slider.value).toFixed(2);
+    speedLabel.textContent = `${speed}x`;
+    onChange(speed);
+  });
+  sliderContainer.appendChild(slider);
 
-    return sliderContainer;
+  return sliderContainer;
 }
 
 function toggleMinimize() {
-    const sliders = Array.from(overlayContainer.children).slice(2); // Exclude title container and loading indicator
-    const isMinimized = sliders[0].style.display === 'none';
+  const sliders = Array.from(overlayContainer.children).slice(2); // Exclude title container and loading indicator
+  const isMinimized = sliders[0].style.display === 'none';
 
-    sliders.forEach(slider => {
-        slider.style.display = isMinimized ? 'block' : 'none';
-    });
+  sliders.forEach(slider => {
+    slider.style.display = isMinimized ? 'block' : 'none';
+  });
 
-    minimizeButton.textContent = isMinimized ? '-' : '+';
+  minimizeButton.textContent = isMinimized ? '-' : '+';
 }
 
 

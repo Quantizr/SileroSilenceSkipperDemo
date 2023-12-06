@@ -170,6 +170,8 @@ titleContainer.style.display = 'flex';
 titleContainer.style.alignItems = 'center';
 titleContainer.style.justifyContent = 'space-between';
 
+titleContainer.style.cursor = 'move'; // Set cursor to indicate draggability
+
 const title = document.createElement('div');
 title.textContent = 'VAD Script Settings';
 title.style.fontSize = '14px';
@@ -197,6 +199,37 @@ overlayContainer.appendChild(speechSpeedSlider);
 const skipSpeedSlider = createSlider('Skip Speed', 1, 5, playbackFast, 0.25, (speed) => f(speed));
 skipSpeedSlider.style.display = 'none';
 overlayContainer.appendChild(skipSpeedSlider);
+
+// Event listeners for dragging
+titleContainer.addEventListener('mousedown', startDrag);
+document.addEventListener('mousemove', handleDrag);
+document.addEventListener('mouseup', endDrag);
+
+// Variables to track drag state
+let isDragging = false;
+let offsetX, offsetY;
+
+// Functions for dragging
+function startDrag(e) {
+    isDragging = true;
+    offsetX = e.clientX - overlayContainer.getBoundingClientRect().left;
+    offsetY = e.clientY - overlayContainer.getBoundingClientRect().top;
+}
+
+function handleDrag(e) {
+    if (isDragging) {
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+        overlayContainer.style.left = `${x}px`;
+        overlayContainer.style.top = `${y}px`;
+        overlayContainer.style.bottom = `auto`;
+        overlayContainer.style.right = `auto`;
+    }
+}
+
+function endDrag() {
+    isDragging = false;
+}
 
 
 function createSlider(labelText, min, max, defaultValue, step, onChange) {
@@ -247,6 +280,8 @@ function toggleMinimize() {
     minimizeButton.textContent = isMinimized ? '-' : '+';
 }
 
+
+
 function s(ps) {
   playbackSlow = ps;
   fastTime = null;
@@ -255,4 +290,43 @@ function s(ps) {
 function f(pf) {
   playbackFast = pf;
   fastTime = null;
+}
+
+//for websites where switching pages breaks the element video is pointing to, e.g. coursera
+function resetVAD() { 
+  video = document.querySelector('video');
+  fastTime = null;
+
+  audioCtx.resume();
+  source = new MediaStreamAudioSourceNode(audioCtx, {
+    mediaStream: video.captureStream(),
+  })
+  const merger = audioCtx.createChannelMerger(1);
+  source.connect(merger);
+  audioNodeVAD.receive(merger);
+  audioNodeVAD.start();
+
+  video.addEventListener("play", function() {
+    fastTime = null;
+    console.log("Play event");
+    noSpeakingSamples = -2; //delay at first
+    audioNodeVAD.start();
+  });
+
+  video.addEventListener("pause", () => {
+    fastTime = null;
+    console.log("Pause event");
+    audioNodeVAD.pause();
+  });
+
+  video.addEventListener("seeked", () => {
+    fastTime = null;
+    console.log("Seeked event");
+  });
+
+  video.addEventListener("loadeddata", () => {
+    fastTime = null;
+    console.log("LoadedData event");
+    setupVAD();
+  });
 }

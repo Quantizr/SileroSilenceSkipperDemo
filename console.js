@@ -111,9 +111,15 @@ function runVAD(){
     vadStarted = true;
 
     //adjust overlay
-    loadingIndicator.style.display = 'none';
-    speechSpeedSlider.style.display = 'block';
-    skipSpeedSlider.style.display = 'block';
+    if (video === null) {
+      console.log("Unable to find video...")
+      loadingIndicator.textContent = 'Unable to find video...';
+    } else {
+      loadingIndicator.style.display = 'none';
+      speechSpeedSlider.style.display = 'block';
+      skipSpeedSlider.style.display = 'block';
+    }
+    
 
 
     if (!video.paused && !source) {
